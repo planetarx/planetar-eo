@@ -1,0 +1,121 @@
+# planetar-eo source registry — Victoria, BC POC
+#
+# Each entry is a SourceSpec (planetar_eo.config.load_sources).
+# Locations are (lat, lon) WGS-84. Verification status is tracked in
+# docs/SOURCES.md. URLs marked [VERIFIED 2026-05-14] respond with real
+# content; others still need by-hand inspection.
+
+sources:
+
+  # ── BC Ferries — Swartz Bay terminal (3 cameras at the same location) ───
+  #
+  # Three direct JPEG endpoints on ccimg.bcferries.com refreshing every ~30s.
+  # cam2 (Tsawwassen-bound traffic) is the best vessel angle; cam1 and cam3
+  # are useful for ferry-vs-other-vessel discrimination.
+
+  - id: bcferries.swartzbay.cam2
+    name: BC Ferries — Swartz Bay → Tsawwassen traffic [VERIFIED 2026-05-14]
+    kind: http_snapshot
+    url: https://ccimg.bcferries.com/cc/support/terminals/cam2_SWB.jpg
+    fps: 0.1
+    location: [48.6883, -123.4106]
+    notes: |
+      Traffic to Vancouver / Tsawwassen — main vessel-traffic angle.
+      Snapshot refreshes ~every 30s. Verified accessible 2026-05-14.
+
+  - id: bcferries.swartzbay.cam1
+    name: BC Ferries — Swartz Bay terminal apron [VERIFIED 2026-05-14]
+    kind: http_snapshot
+    url: https://ccimg.bcferries.com/cc/support/terminals/cam1_SWB.jpg
+    fps: 0.1
+    location: [48.6883, -123.4106]
+
+  - id: bcferries.swartzbay.cam3
+    name: BC Ferries — Swartz Bay → Gulf Islands traffic [VERIFIED 2026-05-14]
+    kind: http_snapshot
+    url: https://ccimg.bcferries.com/cc/support/terminals/cam3_SWB.jpg
+    fps: 0.1
+    location: [48.6883, -123.4106]
+
+  # ── Hakai Institute — Victoria Wharf ─────────────────────────────────────
+  #
+  # Hakai is a respected BC-based marine-research institute; their cam is a
+  # solid Canadian-provenance source. Single-image refresh endpoint.
+
+  - id: hakai.victoria_wharf
+    name: Hakai Institute — Victoria Wharf cam [VERIFIED 2026-05-14]
+    kind: http_snapshot
+    url: https://hecate.hakai.org/webcams/images/victoria/wharf/current.jpg
+    fps: 0.2
+    location: [48.4244, -123.3705]
+    notes: |
+      Hakai Institute publishes wharf-cam stills. Canadian marine-research
+      provenance (citable for CH13 proposal). Refresh cadence unverified;
+      0.2 fps (one frame every 5s) is a safe starting point.
+
+  # ── CHEK News — Ships Point Harbour Cam (YouTube live) ──────────────────
+  #
+  # CHEK runs 24/7 livestreams from Victoria and Nanaimo on YouTube. The
+  # channel URL is stable; the specific live-video URL changes between
+  # broadcasts, so yt-dlp resolves it dynamically.
+
+  - id: chek.victoria_harbour
+    name: CHEK News — Victoria Harbour 24/7 [VERIFIED 2026-05-14]
+    kind: youtube_hls
+    url: https://www.youtube.com/watch?v=ZvqDwjNoN7Y
+    fps: 1.0
+    location: [48.4284, -123.3683]
+    notes: |
+      Pinned to the specific live-video URL (more stable than channel-handle
+      resolution). 24/7 livestream from CHEK News. Channel is @chek_media.
+
+  - id: chek.inner_harbour
+    name: CHEK News × GVHA — Inner Harbour 24/7 [VERIFIED 2026-05-14]
+    kind: youtube_hls
+    url: https://www.youtube.com/watch?v=LrVKmClo8ik
+    fps: 1.0
+    location: [48.4244, -123.3705]
+    notes: |
+      Co-branded CHEK / Greater Victoria Harbour Authority Inner Harbour
+      livestream. Subsumes the older gvha.innerharbour placeholder.
+
+  # ── Victoria Cruise Port — Ogden Point (YouTube live) ────────────────────
+  #
+  # The @VictoriaCruisePort channel runs a cam at the Ogden Point deep-water
+  # terminal — the southern mouth of Victoria Harbour. This is the one
+  # vantage that sees large-vessel traffic (cruise ships, coast guard,
+  # cable-repair ships) entering/leaving the harbour, filling a coverage gap
+  # left by the Inner-Harbour and Swartz Bay cams.
+  #
+  # Use the channel /live URL (not a pinned video id): the operator restarts
+  # the broadcast frequently, so /live always resolves to the current stream.
+
+  - id: cruiseport.ogden_point
+    name: Victoria Cruise Port — Ogden Point terminal [PENDING — seasonal]
+    kind: youtube_hls
+    url: https://www.youtube.com/@VictoriaCruisePort/live
+    fps: 1.0
+    location: [48.4146, -123.3866]
+    notes: |
+      Ogden Point / Breakwater District deep-water terminal, harbour mouth.
+      Seasonal: the stream goes live around cruise-ship calls (roughly
+      Apr–Oct) and otherwise sits in YouTube's pre-live standby state, where
+      yt-dlp reports "this live event will begin in a few moments" and the
+      probe returns no frames. Verify with `probe` when a ship is in.
+
+  # NOTE: the old gvha.innerharbour placeholder is now subsumed by
+  # chek.inner_harbour above (the GVHA cam IS the CHEK Inner Harbour stream).
+
+  # ── Ocean Networks Canada — NOT an EO source ─────────────────────────────
+  #
+  # Deliberately left out as an active source. ONC's "live cameras" are all
+  # *subsea* (seafloor / marine-life observatory feeds), not surface vessel
+  # cams — wrong modality for EO boat detection. ONC's relevance to planetar
+  # is its hydrophones, which belong to the planetar-acoustic lane. Do not
+  # add an onc.* entry here without a confirmed surface-camera endpoint.
+
+  # ── SkylineWebcams — Victoria Harbour wide angle (not viable) ────────────
+  #
+  # Left out: SkylineWebcams serves token-gated HLS that yt-dlp's extractor
+  # currently cannot resolve, and the operator's ToS forbids redistribution.
+  # Prefer an upstream operator's stream if the wide-angle view is wanted.
