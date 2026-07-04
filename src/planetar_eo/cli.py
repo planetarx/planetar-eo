@@ -17,9 +17,43 @@ from typing import Any
 
 import click
 
+from planetar_eo.bus.zmesg import Envelope, uuid_str
 from planetar_eo.config import DEFAULT_BROKER, DEFAULT_MODEL, load_sources
 
 log = logging.getLogger("planetar_eo")
+
+
+def _frame_envelope(source_id: str, frame: Any, n_detections: int) -> Envelope:
+    """Envelope for one grabbed frame. Its id becomes the `causation_id` of
+    every detection derived from it (distributed tracing); `correlation_id`
+    groups all traffic from one camera."""
+    return Envelope(
+        topic="eo.frame",
+        schema_name="planetar.eo.frame.v1",
+        schema_version=1,
+        correlation_id=source_id,
+        payload=json.dumps({
+            "source_id": source_id,
+            "ts_ns": frame.ts_ns,
+            "seq": frame.seq,
+            "height": int(frame.image.shape[0]),
+            "width": int(frame.image.shape[1]),
+            "n_detections": n_detections,
+        }).encode("utf-8"),
+    )
+
+
+def _detection_envelope(source_id: str, det: Any, causation_id: str) -> Envelope:
+    """Envelope for one detection; `causation_id` is the dashed-UUID id of the
+    eo.frame envelope the detection came from."""
+    return Envelope(
+        topic="eo.detection",
+        schema_name="planetar.eo.detection.v1",
+        schema_version=1,
+        correlation_id=source_id,
+        causation_id=causation_id,
+        payload=json.dumps(det.as_dict()).encode("utf-8"),
+    )
 
 
 @click.group()
@@ -115,7 +149,7 @@ def cmd_run(config: str, broker: str, no_broker: bool, model: str, only: tuple[s
     """Pull frames → detect → publish to the broker. Multi-source in threads."""
     import threading
 
-    from planetar_eo.bus import Envelope, Publisher
+    from planetar_eo.bus import Publisher
     from planetar_eo.bus.publisher import StdoutPublisher
     from planetar_eo.detect import YoloVesselDetector
     from planetar_eo.sources import create_source
@@ -144,27 +178,12 @@ def cmd_run(config: str, broker: str, no_broker: bool, model: str, only: tuple[s
                 if stop.is_set():
                     break
                 dets = detector.infer(spec.id, frame.ts_ns, frame.seq, frame.image)
+                frame_env = _frame_envelope(spec.id, frame, len(dets))
+                frame_id = uuid_str(frame_env.id)
                 with lock:
-                    pub.publish(Envelope(
-                        topic="eo.frame",
-                        schema_name="planetar.eo.frame.v1",
-                        schema_version=1,
-                        payload=json.dumps({
-                            "source_id": spec.id,
-                            "ts_ns": frame.ts_ns,
-                            "seq": frame.seq,
-                            "height": int(frame.image.shape[0]),
-                            "width": int(frame.image.shape[1]),
-                            "n_detections": len(dets),
-                        }).encode("utf-8"),
-                    ))
+                    pub.publish(frame_env)
                     for d in dets:
-                        pub.publish(Envelope(
-                            topic="eo.detection",
-                            schema_name="planetar.eo.detection.v1",
-                            schema_version=1,
-                            payload=json.dumps(d.as_dict()).encode("utf-8"),
-                        ))
+                        pub.publish(_detection_envelope(spec.id, d, frame_id))
         except Exception as e:
             log.error("source %s: worker crashed: %s", spec.id, e)
         finally:
